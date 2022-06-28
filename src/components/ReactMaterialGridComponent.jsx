@@ -1,15 +1,18 @@
 import { createElement } from "react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import MaterialTable, { MTableAction, MTableBody, MTableGroupRow, MTableGroupbar } from "material-table";
-import { TableCell, TableFooter, TableRow } from "@material-ui/core";
-import { Button } from "react-bootstrap";
-import Checkbox from "@material-ui/core/Checkbox";
-import FormControlLabel from "@material-ui/core/FormControlLabel";
+//import MaterialTable, { MTableAction, MTableBody, MTableGroupRow, MTableGroupbar } from "material-table";
+import MaterialTable, { Column } from "@material-table/core";
+
+//import { TableCell, TableFooter, TableRow } from "@material-ui/core";
+//import { Button } from "react-bootstrap";
+// import Checkbox from "@material-ui/core/Checkbox";
+// import FormControlLabel from "@material-ui/core/FormControlLabel";
 
 import { forwardRef } from "react";
-import { Menu, MenuItem } from "@material-ui/core";
+//import { Menu, MenuItem } from "@material-ui/core";
 
-import * as XLSX from "xlsx/xlsx.mjs";
+//import * as XLSX from "xlsx/xlsx.mjs";
+import * as XLSX from "xlsx-js-style";
 
 
 import jsPDF from "jspdf";
@@ -87,8 +90,10 @@ function ReactMaterialGridComponent(props) {
         setLoadingOne(loadingOne);
     }, [props.rowData]);
 
+    
+
     let csvData = [];
-    let dataSet = [];
+    let deleteSet = [];
     let groupedData;
     const exportCsv = (columns, data) => {
         debugger;
@@ -110,7 +115,7 @@ function ReactMaterialGridComponent(props) {
                         delete item.Actions && delete item.RuleAutoID && delete item.tableData;
                     });
                 const groups = obj.path.map((e, idx) => {
-                    return { [`Group-${idx}`]: e };
+                    return { e };
                 });
                     dataSet = [...dataSet, ...groups, ...obj.data];
                 }
@@ -120,13 +125,82 @@ function ReactMaterialGridComponent(props) {
                 }
             }
             groupedData.forEach(csvData);
-            console.log(dataSet);
+            console.log('dataSet', dataSet);
         }
 
-        const workSheet = XLSX.utils.json_to_sheet(dataSet);
+        debugger;
+        const ws = XLSX.utils.json_to_sheet(dataSet);
         const workBook = XLSX.utils.book_new();
+        ws["!cols"] = [];
+        ws["!rows"] = [];
+
+        console.log('ws["!cols"]', ws["!cols"]);
+        console.log('ws["!rows"]', ws["!rows"]);
+        ws["!cols"] = [
+        { width: 30 }, // width for col A
+        { width: 30 }, // width for col B
+        { hidden: true }
+        ]; // hidding col C
+
+        ws["!rows"] = [
+        { hpt: 30 }, // height for row 1
+        { hpt: 30 }
+        ]; //height for row 2
+
+        // for (let key in ws) {
+        //     if (ws.hasOwnProperty("A2")) {
+        //         delete ws[Object.keys(ws)[Object.keys(ws).length - 1]];  // "carrot"
+        //                 console.log(key + " -> " + ws[key]);
+        //                 ws[key].s = {
+        //                     fill: {
+        //                     patternType: 'solid', // none / solid
+        //                     fgColor: {rgb: 'FFD3D3D3'}
+        //                     }
+        //                 }
+        
+        //     }
+        // }
+
+        // ws["A2"].s = {
+        //     fill: {
+        //         patternType: "solid",
+        //         fgColor: { rgb: "C0C0C0" },
+        //         bgColor: { rgb: "808080" }
+        //     }
+        // };
+        var colNum = XLSX.utils.decode_col("A");
+        var range = XLSX.utils.decode_range(ws['!ref']);
+        for(var i = range.s.r + 1; i <= range.e.r; ++i) {
+        /* find the data cell (range.s.r + 1 skips the header row of the worksheet) */
+            var ref = XLSX.utils.encode_cell({r:i, c:colNum});
+            /* if the particular row did not contain data for the column, the cell will not be generated */
+            if(!ws[ref]) continue;
+            /* `.t == "n"` for number cells */
+            console.log('ws[ref]', ws[ref]);
+            /* assign the `.z` number format */
+            ws[ref].s = {
+                fill: {
+                    patternType: "solid",
+                    fgColor: { rgb: "C0C0C0" },
+                    bgColor: { rgb: "808080" }
+                }
+            };
+        }
+        // var range = { s: { c: 0, r: 0 }, e: { c: 10, r: 10 } }; // worksheet cell range 
+        // ws['!ref'] = XLSX.utils.encode_range(range); // set cell the range
+
+        // var cell = { // create cell
+        //     s: { // style
+        //         fill: {
+        //             fgColor: { rgb: "FF6666" } // red
+        //         }
+        //     }
+        // }
+        // ws[XLSX.utils.encode_cell({ c: 1, r: 1 })] = cell; 
+        
+
         //XLSX.utils.book_append_sheet(workBook, workSheet, tableTitle.substring(0, 30));
-        XLSX.utils.book_append_sheet(workBook, workSheet, "xlxsdownload");
+        XLSX.utils.book_append_sheet(workBook, ws, "xlxsdownload");
         //Buffer
         XLSX.write(workBook, { bookType: "xlsx", type: "buffer" });
         //Binary string
@@ -225,7 +299,7 @@ function ReactMaterialGridComponent(props) {
 
     const gridActionControls = props.actions.map(item => {
         topBarActions.push({
-            icon: () => <Button className={item.className} />,
+            icon: () => <button className={item.className} />,
             // isFreeAction: item.isFreeAction,
             position: item.position,
             tooltip: item.actionName,
@@ -236,7 +310,7 @@ function ReactMaterialGridComponent(props) {
                 debugger;
 
                 const tableRefArr = [];
-                const deleteSet = tableRef.current.dataManager.data.filter(itemObj => itemObj.tableData.checked === true);
+                deleteSet = tableRef.current.dataManager.data.filter(itemObj => itemObj.tableData.checked === true);
 
                 // if(data.length !== undefined){
                 //     data.forEach((obj, idx) => {
@@ -252,6 +326,8 @@ function ReactMaterialGridComponent(props) {
                 //     }
                 // } else 
                 if (deleteSet.length > 0) {
+                    // const deleteSet = tableRef.current.dataManager.data.filter(itemObj => itemObj.checked === true);
+                    // deleteSet && 
                     deleteSet.map(tdata => {
                                 if (tdata.tableData.checked == true) {
                                     tableRefArr.push(tdata.RuleAutoID);
@@ -302,10 +378,6 @@ function ReactMaterialGridComponent(props) {
         });
     });
 
-    if($('span').hasClass('Mui-checked')) {
-        console.log('am in');
-        $('span').closest('.groupHeader').find('.groupCheck').prop('checked', true)
-    }
     const handleCheckboxClick = (event) => {
         debugger;
 
@@ -331,59 +403,44 @@ function ReactMaterialGridComponent(props) {
 
         const tableRefArr = [];
 
-    
-        $('input[type=checkbox]').change(function(){
-            // var selectedVal = $(this).parent('.groupHeader').children().find('tr').text().split(":", 2).pop().trim();	
-            var selectedVal = this.nextElementSibling.textContent	
-                .split(":", 2)	
-                .pop()	
-                .trim();
-            // if is checked
-            if(this.checked){
-                // check all children
-                var lenchk = $(this).closest('input').find(':checkbox');
-                var lenchkChecked = $(this).closest('input').find(':checkbox:checked');
+        // $('input[type=checkbox]').change(function(){
+        //     // if is checked
+        //     if(this.checked){
+        //         // check all children
+        //         var lenchk = $(this).closest('input').find(':checkbox');
+        //         var lenchkChecked = $(this).closest('input').find(':checkbox:checked');
         
-                //if all siblings are checked, check its parent checkbox
-                if (lenchk.length == lenchkChecked.length) {
-                    tableRef.current.dataManager.data.filter(item => {	
-                        for(let i=0; i<groupedItems.length; i++) {
-                            console.log('item[groupedItems[i]]', item[groupedItems[i]] );
-                            if (item[groupedItems[i]] === selectedVal) {	
-                                item.checked = true;	
-                                item.tableData.checked = true;	
-                                tableRefArr.push(item.RuleAutoID);	
-                                console.log('item.checked ', item.checked );
-                                console.log('item.tableData.checked', item.tableData.checked);
-                            }
-                        }
-                        	
-                    });
-                    $(this).closest('input').siblings().find(':checkbox').prop('checked', true);
-                    $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root').addClass('PrivateSwitchBase-checked-19 Mui-checked');
-                    $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root svg path').attr("d", "M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z");
-                }else{
-                    $(this).closest('.groupHeader').siblings().find(':checkbox').prop('checked', true);
-                }
-            } else {
-                // uncheck all children
-                tableRef.current.dataManager.data.filter(item => {	
-                    for(let i=0; i<groupedItems.length; i++) {
-                        console.log('item[groupedItems[i]]', item[groupedItems[i]] );
-                        if (item[groupedItems[i]] === selectedVal) {	
-                            item.checked = false;	
-                            item.tableData.checked = false;	
-                        }
-                    }
-                });
-                $(this).closest('.groupHeader').siblings().find(':checkbox').prop('checked', false);
-                $(this).closest('input').siblings().find(':checkbox').prop('checked', false);
-                $(this).parent('.groupHeader').children().find('.groupCheck').prop('checked', false);
-                $(this).parents('.groupHeader').find('.groupCheck').prop('checked', false);
-                $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root').removeClass('PrivateSwitchBase-checked-19 Mui-checked')
-                $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root svg path').attr("d", "M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z");
-            }
-        });
+        //         //if all siblings are checked, check its parent checkbox
+        //         if (lenchk.length == lenchkChecked.length) {
+        //             tableRef.current.dataManager.data.filter((item, index) => {	
+        //                 if (item[groupedItems[index]] !== undefined) {	
+        //                     item.checked = true;	
+        //                     item.tableData.checked = true;	
+        //                     tableRefArr.push(item.RuleAutoID);	
+        //                 }	
+        //             });
+        //             $(this).closest('input').siblings().find(':checkbox').prop('checked', true);
+        //             $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root').addClass('PrivateSwitchBase-checked-19 Mui-checked');
+        //             $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root svg path').attr("d", "M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z");
+        //         }else{
+        //             $(this).closest('.groupHeader').siblings().find(':checkbox').prop('checked', true);
+        //         }
+        //     } else {
+        //         // uncheck all children
+        //         tableRef.current.dataManager.data.filter(item => {	
+        //             if (item[groupedItems[index]] !== undefined) {	
+        //                 item.checked = false;	
+        //                 item.tableData.checked = false;	
+        //             }
+        //         });
+        //         $(this).closest('.groupHeader').siblings().find(':checkbox').prop('checked', false);
+        //         $(this).closest('input').siblings().find(':checkbox').prop('checked', false);
+        //         $(this).parent('.groupHeader').children().find('.groupCheck').prop('checked', false);
+        //         $(this).parents('.groupHeader').find('.groupCheck').prop('checked', false);
+        //         $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root').removeClass('PrivateSwitchBase-checked-19 Mui-checked')
+        //         $(this).parent('.groupHeader').children().find('span.MuiCheckbox-root svg path').attr("d", "M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z");
+        //     }
+        // });
        
         // if (props.Table_Ref.status === "available" && data.length != undefined) {
         //     props.Table_Ref.setValue(
@@ -399,28 +456,19 @@ function ReactMaterialGridComponent(props) {
         // }
     };
 
-    const customRow = rowData => (
-        <div className="groupHeader">
-            <input
-                data-val={rowData}
-                type="checkbox"
-                className="groupCheck"
-                onClick={event => handleCheckboxClick(event)}
-            />
-            <MTableGroupRow {...rowData} />
-            {/* <CustomGroupRow {...rowData} /> */}
-        </div>
-    );
+    // const customRow = rowData => (
+    //     <div className="groupHeader">
+    //         <input
+    //             data-val={rowData}
+    //             type="checkbox"
+    //             className="groupCheck"
+    //             onClick={event => handleCheckboxClick(event)}
+    //         />
+    //         {/* <MTableGroupRow {...rowData} /> */}
+    //         {/* <CustomGroupRow {...rowData} /> */}
+    //     </div>
+    // );
 
-    const handleClick = (event, selectedRows) => { 
-        console.log(event)
-        console.log('selectedRows', selectedRows);
-        if(event.tableData.checked == true) {
-            $('span.Mui-checked').closest('.groupHeader').find('.groupCheck').prop('checked', true);
-        } else {
-            $('span').closest('.groupHeader').find('.groupCheck').prop('checked', false);
-        }
-    }
     return (
         <div className="App">
             {/* {loadingOne ? <CircularProgress /> */}
@@ -432,10 +480,10 @@ function ReactMaterialGridComponent(props) {
                 data={rows}
                 isLoading={loadingOne ?? <CircularProgress />}
                 actions={topBarActions}
-                onSelectionChange={(selectedRows, e) => handleClick(e, selectedRows) }
-                components={{
-                    GroupRow: rowData => customRow(rowData)
-                }}
+                //onSelectionChange={selectedRows => console.log("selectedRows", selectedRows)}
+                // components={{
+                //     GroupRow: rowData => customRow(rowData)
+                // }}
                 options={{
                     showEmptyDataSourceMessage: loadingOne ?? <CircularProgress />,
                     minBodyHeight: 560,
@@ -476,7 +524,7 @@ function ReactMaterialGridComponent(props) {
                     searchFieldVariant: "outlined",
                     addRowPosition: "first",
                     actionsColumnIndex: -1,
-                    showTextRowsSelected: false
+                    showTextRowsSelected: true
                 }}
                 title={""}
             />
